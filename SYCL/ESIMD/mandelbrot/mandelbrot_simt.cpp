@@ -7,7 +7,7 @@
 //===----------------------------------------------------------------------===//
 // REQUIRES: gpu
 // UNSUPPORTED: cuda
-// RUN: %clangxx -fsycl %s -I%S/.. -o %t.out
+// RUN: %clangxx-esimd -fsycl %s -I%S/.. -o %t.out
 // RUN: %GPU_RUN_PLACEHOLDER %t.out %T/output.ppm %S/golden_hw.ppm
 
 #include "esimd_test_utils.hpp"
@@ -18,7 +18,7 @@
 #include <memory>
 
 using namespace cl::sycl;
-using namespace sycl::ext::intel::experimental::esimd;
+using namespace sycl::INTEL::gpu;
 
 #ifdef _SIM_MODE_
 #define CRUNCH 32
@@ -41,7 +41,7 @@ ESIMD_INLINE void mandelbrot(ACC out_image, int ix, int iy, int crunch,
 
   simd<int, 16> m = 0;
 
-  for (auto lane = 0; lane < 16; ++lane) {
+  SIMT_BEGIN(16, lane)
     int ix_lane = ix + (lane & 0x7);
     int iy_lane = iy + (lane >> 3);
     float xPos = ix_lane * scale + xOff;
@@ -61,7 +61,7 @@ ESIMD_INLINE void mandelbrot(ACC out_image, int ix, int iy, int crunch,
     } while ((mtemp < crunch) & (xx + yy < 4.0f));
 
     m.select<1, 0>(lane) = mtemp;
-  }
+  SIMT_END
 
   simd<int, 16> color = (((m * 15) & 0xff)) + (((m * 7) & 0xff) * 256) +
                         (((m * 3) & 0xff) * 65536);
