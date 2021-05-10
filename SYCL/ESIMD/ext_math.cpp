@@ -57,7 +57,7 @@ template <MathOp Op> float HostMathFunc(float X);
   template <int VL> struct DeviceMathFunc<VL, MathOp::Op> {                    \
     simd<float, VL>                                                            \
     operator()(const simd<float, VL> &X) const SYCL_ESIMD_FUNCTION {           \
-      return esimd_##Op<VL>(X);                                                \
+      return sycl::##Op<VL>(X);                                                \
     }                                                                          \
   }
 
@@ -155,16 +155,16 @@ bool test(queue &Q, const std::string &Name,
 template <int VL> bool test(queue &Q) {
   bool Pass = true;
 
-  Pass &= test<MathOp::sqrt, VL>(Q, "sqrt", InitDataFuncWide{});
-  Pass &= test<MathOp::inv, VL>(Q, "inv");
-  Pass &= test<MathOp::rsqrt, VL>(Q, "rsqrt");
+  //Pass &= test<MathOp::sqrt, VL>(Q, "sqrt", InitDataFuncWide{});
+  //Pass &= test<MathOp::inv, VL>(Q, "inv");
+  //Pass &= test<MathOp::rsqrt, VL>(Q, "rsqrt");
 // TODO enable these tests after the implementation is fixed
-#if ENABLE_SIN_COS_EXP_LOG
-  Pass &= test<MathOp::sin, VL>(Q, "sin", InitDataFuncWide{});
+//#if ENABLE_SIN_COS_EXP_LOG
+  //Pass &= test<MathOp::sin, VL>(Q, "sin", InitDataFuncWide{});
   Pass &= test<MathOp::cos, VL>(Q, "cos", InitDataFuncWide{});
-  Pass &= test<MathOp::exp, VL>(Q, "exp");
-  Pass &= test<MathOp::log, VL>(Q, "log", InitDataFuncWide{});
-#endif
+  //Pass &= test<MathOp::exp, VL>(Q, "exp");
+  //Pass &= test<MathOp::log, VL>(Q, "log", InitDataFuncWide{});
+//#endif
   return Pass;
 }
 
@@ -176,8 +176,8 @@ int main(void) {
   std::cout << "Running on " << Dev.get_info<info::device::name>() << "\n";
   bool Pass = true;
   Pass &= test<8>(Q);
-  Pass &= test<16>(Q);
-  Pass &= test<32>(Q);
+  //Pass &= test<16>(Q);
+  //Pass &= test<32>(Q);
   std::cout << (Pass ? "Test Passed\n" : "Test FAILED\n");
   return Pass ? 0 : 1;
 }

@@ -14,6 +14,7 @@
 
 #include <CL/sycl.hpp>
 #include <CL/sycl/INTEL/esimd.hpp>
+#include <CL/sycl/builtins_esimd.hpp>
 #include <iostream>
 
 using namespace cl::sycl;
@@ -99,3 +100,4 @@ int main(void) {
 // CHECK: ---> piProgramBuild(
 // CHECK: <const char *>: {{.*}}-vc-codegen
 // CHECK: ) ---> pi_result : PI_SUCCESS
+
