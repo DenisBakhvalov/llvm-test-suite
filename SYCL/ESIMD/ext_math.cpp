@@ -16,6 +16,8 @@
 
 #include <CL/sycl.hpp>
 #include <CL/sycl/INTEL/esimd.hpp>
+#include <CL/sycl/builtins_esimd.hpp>
+#include <iomanip>
 #include <iostream>
 
 using namespace cl::sycl;
@@ -41,6 +43,15 @@ struct InitDataFuncNarrow {
   }
 };
 
+struct InitDataInRange0_5 {
+  void operator()(float *In, float *Out, size_t Size) const {
+    for (auto I = 0; I < Size; ++I) {
+      In[I] = 5.0f * ((float)I / (float)(Size - 1)); // in [0..5] range
+      Out[I] = (float)0.0;
+    }
+  }
+};
+
 // --- Math operation identification
 
 enum class MathOp { sin, cos, exp, sqrt, inv, log, rsqrt };
@@ -57,17 +68,28 @@ template <MathOp Op> float HostMathFunc(float X);
   template <int VL> struct DeviceMathFunc<VL, MathOp::Op> {                    \
     simd<float, VL>                                                            \
     operator()(const simd<float, VL> &X) const SYCL_ESIMD_FUNCTION {           \
-      return sycl::##Op<VL>(X);                                                \
+      return sycl::Op<VL>(X);                                                \
     }                                                                          \
   }
+
+#define DEFINE_OP1(Op, HostOp)                                                  \
+  template <> float HostMathFunc<MathOp::Op>(float X) { return HostOp(X); }    \
+  template <int VL> struct DeviceMathFunc<VL, MathOp::Op> {                    \
+    simd<float, VL>                                                            \
+    operator()(const simd<float, VL> &X) const SYCL_ESIMD_FUNCTION {           \
+      return esimd_##Op<VL>(X);                                                \
+    }                                                                          \
+  }
+
 
 DEFINE_OP(sin, sin);
 DEFINE_OP(cos, cos);
 DEFINE_OP(exp, exp);
+//DEFINE_OP1(exp, exp);
 DEFINE_OP(log, log);
-DEFINE_OP(inv, 1.0f /);
-DEFINE_OP(sqrt, sqrt);
-DEFINE_OP(rsqrt, 1.0f / sqrt);
+//DEFINE_OP(inv, 1.0f /);
+//DEFINE_OP(sqrt, sqrt);
+//DEFINE_OP(rsqrt, 1.0f / sqrt);
 
 // --- Generic kernel calculating an extended math operation on array elements
 
@@ -124,6 +146,7 @@ bool test(queue &Q, const std::string &Name,
   }
 
   int ErrCnt = 0;
+  float maxError = 0.f;
 
   for (unsigned I = 0; I < Size; ++I) {
     float Gold = A[I];
@@ -132,14 +155,23 @@ bool test(queue &Q, const std::string &Name,
 
     if (abs(Test - Gold) > 0.0001) {
       if (++ErrCnt < 10) {
-        std::cout << "    failed at index " << I << ", " << Test
+        std::cout << "    failed at index " << I << ", " << std::fixed << std::setprecision(6) << Test
                   << " != " << Gold << " (gold)\n";
       }
     }
+    if (abs(Test - Gold) > maxError) {
+            std::cout << "    failed at index " << I << ", " << std::fixed << std::setprecision(6) << Test
+                  << " != " << Gold << " (gold)\n";
+    maxError = std::max(maxError, abs(Test - Gold));
+    std::cout << "    error: " << std::fixed << std::setprecision(6) << maxError;
+    }
+
   }
   delete[] A;
   delete[] B;
 
+  std::cout << "    max error: " << std::fixed << std::setprecision(6) << maxError;
+ 
   if (ErrCnt > 0) {
     std::cout << "    pass rate: "
               << ((float)(Size - ErrCnt) / (float)Size) * 100.0f << "% ("
@@ -161,8 +193,8 @@ template <int VL> bool test(queue &Q) {
 // TODO enable these tests after the implementation is fixed
 //#if ENABLE_SIN_COS_EXP_LOG
   //Pass &= test<MathOp::sin, VL>(Q, "sin", InitDataFuncWide{});
-  Pass &= test<MathOp::cos, VL>(Q, "cos", InitDataFuncWide{});
-  //Pass &= test<MathOp::exp, VL>(Q, "exp");
+  //Pass &= test<MathOp::cos, VL>(Q, "cos", InitDataFuncWide{});
+  Pass &= test<MathOp::exp, VL>(Q, "exp", InitDataInRange0_5{});
   //Pass &= test<MathOp::log, VL>(Q, "log", InitDataFuncWide{});
 //#endif
   return Pass;
